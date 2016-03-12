@@ -3,8 +3,49 @@ Parallelamente agli sviluppi tecnologici nel mondo dell'elettronica si è posto 
 
 
 \section{Il livello Data Link}
+In questo paragrafo saranno trattati i protocolli del livello Data Link applicati all'IoT. Grandi protagonisti in questo ambito sono i protocolli radio, data la natura indipendente e mobile degli smart objects, che permettono ai dispositivi di comunicare senza avere necessità di collegamenti ingombranti e poco utili. Le frequenze trasmissive sono solitamente quelle ISM (Industrial, Scientific and Medical), porzioni dello spettro elettromagnetico non commerciali e che possono essere liberamente utilizzate, rispettando le potenze trasmissive imposte dai singoli Paesi. Troviamo quindi spesso protocolli che utilizzano le frequenze intorno ai 2,4 GHz come 802.15.4, WiFi (nei suoi standard b/g), Bluetooth, ANT+ ecc...
+\\Queste frequenze garantiscono una discreta immunità da interferenze, la possibilità di utilizzare antenne ridotte e una buona larghezza di banda, anche se una scarsa penetrabilità degli ostacoli, il che limita solitamente il raggio utile a non più di 100 metri, a seconda della modulazione utilizzata.
+\\\\Proprio per via dello scarso raggio d'azione ultimamente si stanno affacciando anche protocolli che operano nelle frequenze Sub-GHz, ovvero al di sotto del GHz, solitamente sfruttando le frequenze 868-915 MHz. L'utilizzo di frequenze più ridotte permette di trasmettere segnali ad una distanza maggiore, anche fino a 500-1000 Km, mantenendo pressochè uguali le potenze di trasmissione ma sacrificando il data rate. Alcuni network operativi sulle frequenze Sub-1GHz stanno nascendo per dare la possibilità agli smart objects di connettersi direttamente alla rete Internet senza bisogno di infrastrutture di supporto. Tra questi ricordiamo i più importanti, LoRa e SigFox, di cui parleremo successivamente.
 
-\subsection{802.15.4}
+\subsection{802.15.4 e ZigBee}
+Tra i protocolli radio che maggiormente hanno trovato successo nel mondo IoT sicuramente 802.15.4, e le sue commercializzazioni, è uno di quelli che spicca maggiormente. Come tutte le reti appartenenti alle specifiche IEEE 802.15.x si tratta di un protocollo sviluppato per reti wireless a stretto raggio di copertura del segnale e con basse velocità di trasferimento, ovvero reti LR-WPAN (Low Rate Wireless Personal Area Network).
+\\In questo ambito le applicazioni che vogliono utilizzare queste specifiche hanno richieste di:
+\begin{itemize}
+\item Bassi costi
+\item Bassa complessità di implementazione
+\item Scarsi consumi energetici, ovvero ampia durata di eventuali batterie
+\item Data rate modesti
+\end{itemize}
+Le topologie di rete previste in questo standard sono due, a stella e peer-to-peer, e con due differenti tipologie di dispositivi partecipanti: Full Function Device (FFD) e Reduced Function Device (RFD). Gli RFD sono tipicamente dispositivi a scarsa o scarsissima potenza computazionale che sono in grado di svolgere funzioni basiche e pertanto possono comunicare solamente con dispositivi FFD, i quali si occuperanno, se necessario, di smistare i messaggi verso altri RFD o verso dispositivi di più alto livello.
+\\Nella topologia a stella troviamo un nodo FDD centrale che funge da \textit{PAN Coordinator}, ovvero smista i pacchetti provenienti dai nodi RFD e comunica con altri nodi FDD che però non hanno ruolo di coordinatori. In questa topologia è il \textit{Coordinator} che per primo comunica agli altri nodi l'identificativo della rete, rendendo la rete completamente indipendente da eventuali altre reti presenti.
+\\Nella topologia peer-to-peer, invece, il primo device FDD che trasmette diventa \textit{Coordinator} ma in qualunque momento un nodo FDD può assumere quel ruolo per coordinare nodi RFD che sono collegati a lui e instradare il messaggio sulla rete. 802.15.4 non definisce alcun protocollo di routing per questa topologia di rete, demandando il compito agli strati superiori.
+\\\\La modalità di accesso al canale è CSMA/CA (in versione "semplificata"), mentre per la trasmissione si utilizzano tecnologie \textit{Spread Spectrum} per ridurre le interferenze.
+\\Le frequenze solitamente utilizzate sono le classiche 2.4 GHz, ma in realtà talvolta 802.15.4 viene utilizzato su frequenze Sub-1Ghz, in particolare 868 e 915 MHz e, con le ultime revisioni dello standard, è stata introdotta anche la possibilità di utilizzare frequenze a 5 GHz, molto più libere da interferenze.
+\\I data-rates supportati sono 250, 40 e 20 kb/s e il raggio utile di trasmissione non supera i 30-40 metri.
+\\\\Il pacchetto 802.15.4, a livello PHY (\textit{Physical}) è formato da:
+\begin{itemize}
+\item \textbf{Preamble}: 4 byte di lunghezza, utilizzato per la sincronizzazione
+\item \textbf{Start of Packet Delimiter}: 8 bit di lunghezza, utilizzato anche questo per sincronizzare la comunicazione
+\item \textbf{PHY Header}: 1 byte, contenente il campo \textit{Frame Length} di 7 bit più 1 bit riservato per usi futuri.
+\item \textbf{PHY Service Data Unit (PSDU)}: da 0 a 127 byte di lunghezza, contenente a sua volta il pacchetto MAC.
+\end{itemize}
+Il pacchetto dello strato MAC è articolato ma è interessante notare come l'indirizzamento preveda un indirizzo univoco da 64 bit per ogni dispositivo sulla stessa rete PAN e quindi, potenzialmente, circa 18 trilioni di dispositivi per ogni network.
+\\Tuttavia al momento dell'associazione alla rete il \textit{Coordinator} assegna al device uno \textit{short-address} da 16 bit, limitando quindi l'indirizzamento a 65'535 dispositivi, numero comunque sufficiente a coprire ampiamente le esigenze odierne.
+\begin{figure}[!h]
+\centering
+\includegraphics[scale=3.00]{immagini/802154-frame.png}
+\caption{\textit{Il frame 802.15.4, sia a livello fisico che a livello MAC}}
+\end{figure}
+802.15.4 è in grando inoltre di sfruttare tecniche di accesso al canale e trasmissione/ricezione sincronizzate per ottimizzare al massimo il risparmio energetico, importante richiesta di questa tipologia di dispositivi, e prevede dei meccanismi di sicurezza integrati nello strato MAC, per fornire integrità, autenticazione e confidenzialità ai messaggi, pur mantenedo un basso profilo energetico.
+\vspace{1.0cm}
+\\Sopra lo standard 802.15.4 sono state costruite diverse "commercializzazioni" e standard operanti sui livelli più alti dello stack ISO/OSI. Uno dei più famosi e largamente utilizzati è certamente \textbf{ZigBee}, nato nel 2004 e giunto ora alla sua terza specifica. ZigBee prevede tre possibili tipologie di dispositivi partecipanti:
+\begin{itemize}
+\item \textit{ZigBee Coordinator}: coincide in tutto e per tutto con l'omonimo ruolo della specifica 802.15.4, ovvero si occupa di "creare" la rete, memorizzare eventuali chiavi di sicurezza e può operare da ponte tra più reti. Ci può essere un solo \textit{Coordinator} per ogni rete.
+\item \textit{ZigBee Router}: questa tipologia di dispositivi permette di scambiare pacchetti tra i dispositivi o tra porzioni della stessa rete, effettuando anche multi-hopping, ovvero ritrasmissione e routing.
+\item \textit{ZigBee End Device}: sono i dispositivi a funzionalità minime, possono dialogare solo con i \textit{Coordinator} o con i \textit{Router} e non partecipano al multi-hop di un messaggio.
+\end{itemize}
+Il protocollo di routing solitamente utilizzato è l'AODV (\textit{Ad-hoc On-demand Distance Vector}, un algoritmo derivato dal classico \textit{Distance Vector} ma pensato per reti mobili e dove le trasmissioni devono essere limitate al minimo. AODV, a differenza di Distance Vector classico, interviene a calcolare il percorso di routing solo quando richiesto, ovvero quando si cerca di accedere ad un nodo di cui ancora non si conosce il percorso; questo limita notevolmente il traffico per percorsi già stabiliti anche se aumenta considerevolmente il tempo di risposta nel caso il routing sia ancora sconosciuto. AODV supporta anche instradamenti di tipo unicast e multicast.
+
 \subsection{Altri}
 
 \section{I livelli di rete e trasporto}
