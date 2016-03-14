@@ -1,8 +1,21 @@
 \chapter{Architettura e sviluppo del sistema}
-
-
+Come esposto nei capitoli precedenti, le reti IoT nascono con l'intenzione di mettere in comunicazione potenzialmente milioni di sensori e dispositivi. Questi dispositivi possono avere interfacce differenti, avere hardware differente e possono assolvere a compiti completamente differenti l'uno dall'altro. L'obiettivo è quello di sviluppare un sistema centralizzato in grado di monitorare questi smart objects, su richiesta dell'utente, e pubblicare cambiamenti di stato o valori periodici su canali familiari all'utente, che può consultare con semplicità.
+\\Il sistema deve necessariamente essere strutturato considerando le seguenti parole chiave:
+\begin{itemize}
+\item \emph{Scalabilità}: data la potenziale mole di nodi da osservare è mandatorio che il sistemi scali correttamente.
+\item \emph{Portabilità}: il sistema deve essere slegato da vincoli hardware e soprattutto software relativi ai sistemi operativi, data la molteplicità di realtà presenti oggi sul mercato, potendo potenzialmente essere portato in sistemi cloud più estesi.
+\item \emph{Interoperabilità}: il sistema deve necessariamente essere interoperabile, ovvero deve poter operare con il maggior numero possibile di nodi e dispositivi, cercando di astrarre il più possibile dal tipo di dati trattati e dalle sue caratteristiche intrinseche. Il sistema deve inoltre essere in grado, potenzialmente, di poter restituire i dati su differenti canali ed essere sempre pronto all'espansione e alle modifiche in tal senso.
+\end{itemize}
+Il sistema sarà quindi composto da tre unità fondamentali:
+\begin{itemize}
+\item La cloud Java
+\item Il DBMS
+\item L'interfaccia Web
+\end{itemize}
+Tutte le componenti sono state pensate e sviluppate per poter essere indipendenti e intercambiabili, nei limiti del possibile, per ottenere un sistema flessibile e facilmente manutenibile.
 
 \section{La cloud Java}
+La cloud Java è certamente la componente più importante dell'intero sistema: essa si occupa infatti di effettuare il monitoraggio delle risorse tramite protocollo CoAP su richiesta dell'interfaccia Web, e di pubblicare, periodicamente o al succedersi di un evento, i dati ottenuti su canali definiti dall'utente, chiamati \textit{connettori}.
 
 \subsection{XML-RPC}
 \subsection{I connettori}
