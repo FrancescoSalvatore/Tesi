@@ -25,12 +25,13 @@ La cloud Java è certamente la componente più importante dell'intero sistema: e
 \\Le richieste dall'interfaccia Web verso la cloud sono fatte mediante chiamate remote, utilizzando XML-RPC.
 \\È stato scelto il linguaggio Java principalmente per la sua caratteristica intrinseca di portabilità: è infatti sufficiente avere la JVM (Java Virtual Machine) per far girare la cloud, non essendoci chiamate particolari al sistema operativo e non effettuando alcuna operazione dedicata su hardware specifico. Il linguaggio Java inoltre, grazie al livello di astrazione eccezionale che fornisce, ha permesso uno sviluppo veloce e abbastanza ordinato, anche grazie all'ampia disponibilità di librerie, sia integrate che facilmente reperibili da terze parti. 
 \\La cloud è sostanzialmente composta da un server XML-RPC, la classe {\tt Server}, che è sempre in esecuzione e disponibile, che riceve le chiamate remote dall'interfaccia; a questo punto le chiamate vengono passate all'handler XML-RPC, la classe {\tt CoapHandler}, che a sua volta le smista al {\tt CoapAgent}, un thread particolare di cui esiste una sola istanza, che è un po' l'esecutore materiale della richiesta: si occupa infatti di creare l'azione richiesta nel database, configurare il connettore e lanciare il thread specifico che si occuperà di monitorare la risorsa indicata dall'utente. L'{\tt Agent} ha anche il compito di interrompere l'esecuzione di questi thread di monitoraggio se richiesto e, anche se in piccola parte, si occupa di controllare che ogni thread non sia "pendente", ovvero che non sia rimasto in esecuzione nonostante la sua azione non sia più presente nel database.
-\begin{figure}[pt]
+\begin{figure}[hp]
 \centering
 \includegraphics[width=\textwidth]{immagini/uml.png}
 \caption{\textit{Il diagramma UML delle classi della cloud Java}}
 \end{figure}
-\\\\Possiamo trovare due tipi, per il momento, di thread di monitoraggio:
+\vspace{1.00cm}
+Possiamo trovare due tipi, per il momento, di thread di monitoraggio:
 \begin{itemize}
 \item {\tt ObserveThread}: si mettono in ascolto su di una risorsa e, in caso di cambiamento di evento sulla risorsa, lo notificano al connettore scelto.
 \item {\tt PeriodicThread}: controllano periodicamente il valore della risorsa indicata, secondo il tempo richiesto dall'utente, e notificano il valore al connettore scelto.
@@ -38,7 +39,117 @@ La cloud Java è certamente la componente più importante dell'intero sistema: e
 I connettori quindi ricevono il valore e lo elaborano, a seconda del comportamento del connettore stesso.
 \\\\Il DBMS scelto è MySQL, per alcune semplici ragioni: è gratuito, nella sua versione base, è semplice da installare ed è multipiattaforma, oltre che essere conforme agli standard ANSI SQL e ODBC SQL. Per la connessione e la gestione è stato però scelto di utilizzare il driver \textit{JDBC} (Java DataBase Connectivity), che permette di creare un livello di astrazione tra le chiamate al database e il database stesso, garantendo la possibilità di poter cambiare DBMS con semplicità e in maniera "indolore", senza quindi dover radicalmente modificare la struttura o il codice stesso del programma. Questo accorgimento ci permette di poter spaziare tra i DBMS che supportano ODBC e per i quali esiste il driver specifico, tra i quali troviamo i maggiormente utilizzati PostgreSQL, Oracle, Microsoft SQL Server, Sybase, DB2, SQLite e molti altri.
 \\Vi è inoltre una classe che si occupa di implementare l'astrazione dal database, che è la classe {\tt DatabaseManager}.
-\\\\Per la comunicazione verso le risorse, ovvero gli smart objects, è stato scelto il protocollo CoAP. CoAP è semplice, garantisce un basso overhead ed è in grado di funzionare adeguatamente sia su reti IPv4 che IPv6, garantendo una buona interoperabilità del nostro sistema e delle reti monitorate con infrastrutture e architettura già presenti. CoAP inoltre presenta la possibilità di "osservare" una risorsa, tenendo costantemente monitorato il suo valore ed essendo avvisati dalla risorsa stessa in caso di cambiamento, evitando alla cloud di dover effettuare un polling costante sulla risorsa stessa, che sarebbe eccessivamente gravoso sia in termini di risorse di calcolo sia in termini di traffico di rete generato (ricordiamo che spesso questi smart objects sono all'interno di reti a ristretta larghezza di banda ed effettuare polling costanti anche su pochi dispositivi significherebbe saturare queste reti).
+
+%Server.java
+\lstset{title=La classe Server}
+\begin{lstlisting}[float]
+public class Server {
+	
+	private static int port = 8008;
+	
+	public static void main(String args[])
+	{
+		try
+		{
+			WebServer server = new WebServer(port);
+			XmlRpcServer xmlrpcserver = server.getXmlRpcServer();
+			PropertyHandlerMapping phm = new PropertyHandlerMapping();
+			phm.addHandler("coap", com.francescosalvatore.coap.CoapHandler.class);
+			xmlrpcserver.setHandlerMapping(phm);
+			server.start();
+			System.out.println("CoAP Cloud Server running on port "+port+"...");
+		}
+		catch(Exception e)
+		{
+			System.out.println(e.getMessage());
+		}
+	}
+}
+\end{lstlisting}
+
+%CoapAgent.java
+\lstset{title=L'interfaccia CoapAgent}
+\begin{lstlisting}[float]
+public interface CoapAgent {
+	
+	/**
+	 * Register an OBSERVABLE action on ResourceURI specified.
+	 * @param actionName is the name of the action.
+	 * @param connectionId is the identifier of connection in database.
+	 * @param resourceURI is the URI that point to the observable resource.
+	 * @return TRUE if action has been correctly created, FALSE otherwise.
+	 */
+	public boolean addAction(String actionName, int connectionId, String resourceURI);
+	
+	/**
+	 * Register a PERIODIC action on ResourceURI specified.
+	 * @param actionName is the name of the action.
+	 * @param connectionId is the identifier of connection in database.
+	 * @param resourceURI is the URI that point to the observable resource.
+	 * @param period is the periodic time (in seconds). At each period the Agent send a GET request to the resource
+	 * and perform the action request by connector.
+	 * @return TRUE if action has been correctly created, FALSE otherwise.
+	 */
+	public boolean addAction(String actionName, int connectionId, String resourceURI, int period);
+	
+	/**
+	 * @param actionId is the action identifier in database.
+	 * @return TRUE if the action is unregistered, FALSE if an error has occurred.
+	 */
+	public boolean unregisterAction(int actionId);
+	
+	/**
+	 * @return the number of running threads on this Agent. 
+	 */
+	public int getLoad();
+}
+\end{lstlisting}
+
+%CoapAgent.java
+\lstset{title=L'ObserveThread}
+\begin{lstlisting}[float]
+public class ObserveThread extends CoapThread {
+	
+	CoapClient client;
+	CoapObserveRelation relation;
+	
+	public ObserveThread(String actionName, int connectionId, String resourceURI) throws SQLException, InvalidConnectorException
+	{
+		ActionDatabaseManager dbMan = new ActionDatabaseManager();
+		int actionId = dbMan.addAction(actionName, connectionId, resourceURI);
+		if(actionId == 0) throw new SQLException("Error during INSERT action in database.");
+		this.setActionId(actionId);
+		
+		//Build correct handler from connector
+		Connector connector;
+		String connectionInfo = dbMan.getConnectionInfo(connectionId);
+		switch(dbMan.getConnectorName(dbMan.getConnectorId(connectionId)))
+		{
+			case "Twitter":
+				connector = new TwitterConnector(connectionInfo);
+				break;
+				
+			default: 
+				connector = null;
+				throw new InvalidConnectorException("Connector name provided is not valid.");
+		}
+		
+		this.client = new CoapClient(resourceURI);
+		this.relation = client.observe(connector);
+	}
+	
+	public void run()
+	{
+		try {
+			for(;;) Thread.sleep(Long.MAX_VALUE);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+	}
+}
+\end{lstlisting}
+
+Per la comunicazione verso le risorse, ovvero gli smart objects, è stato scelto il protocollo CoAP. CoAP è semplice, garantisce un basso overhead ed è in grado di funzionare adeguatamente sia su reti IPv4 che IPv6, garantendo una buona interoperabilità del nostro sistema e delle reti monitorate con infrastrutture e architettura già presenti. CoAP inoltre presenta la possibilità di "osservare" una risorsa, tenendo costantemente monitorato il suo valore ed essendo avvisati dalla risorsa stessa in caso di cambiamento, evitando alla cloud di dover effettuare un polling costante sulla risorsa stessa, che sarebbe eccessivamente gravoso sia in termini di risorse di calcolo sia in termini di traffico di rete generato (ricordiamo che spesso questi smart objects sono all'interno di reti a ristretta larghezza di banda ed effettuare polling costanti anche su pochi dispositivi significherebbe saturare queste reti).
 \\La libreria che ci permette di effettuare queste operazioni su CoAP è Californium, un framework completo che permette di lavorare sia in modalità client che server, sviluppato da Matthias Kovatsch. Californium è passata con successo all'ETSI (European Telecommunications Standards Institute) IoT PlugTest, un test di interoperabilità tra sistemi di smart objects. Californium è potente ma allo stesso tempo leggero e facilmente gestibile. Inoltre permette di simulare smart objects su differenti reti, funzionalità che ho ampiamente utilizzato per emulare una rete di sensori.
 
 \subsection{XML-RPC}
@@ -50,6 +161,58 @@ Considerando gli obiettivi del sistema di portabilità e interoperabilità era n
 Uno dei problemi dell'utilizzare reti di sensori estese è sicuramente quello di ottenere i dati in maniera semplice, chiara, leggibile anche da un utente consumatore senza particolare esperienza nel campo tecnologico, e certamente una delle funzionalità più interessanti è quella di essere avvisati dalla rete di sensori quando sussiste un determinato evento (un cambiamento di un valore di temperatura, oppure un movimento rilevato da un sensore di movimento ecc...). È quindi utile poter utilizzare canali comodi e familiari all'utente, come per esempio i social media, per pubblicare i dati e da qui l'idea di sviluppare il sistema modulare, pronto per impiantare sopra di esso dei \textit{connettori}, ossia delle interfacce di astrazione che si occupano di ricevere il dato grezzo ed elaborarlo, secondo la propria specifica: il connettore di Twitter, per esempio, potrebbe pubblicare un tweet, o quello di Facebook un messaggio sulla propria bacheca; o ancora un connettore per Telegram, la nota app di messaggistica, potrebbe inviarci un messaggio sul nostro smartphone oppure il connettore mail potrebbe inviare una email al nostro indirizzo personale e via dicendo.
 \\La cloud Java offre quindi una interfaccia {\tt Connector} che definisce alcuni metodi e proprietà che ogni connettore deve avere, ma lascia ampia libertà implementativa, permettendo una customizzazione abbastanza elevata del comportamento del singolo connettore.
 \\Nel sistema cloud in questione è stato implementato un solo connettore, quello di Twitter, che è in grado di pubblicare sulla propria timeline un tweet contenente il dato estratto dalla risorsa monitorata.
+
+%TwitterConnector.java
+\lstset{title=Parte della classe TwitterConnector}
+\begin{lstlisting}[float]
+public class TwitterConnector extends Connector {
+	
+	private TwitterFactory _twitterFactory;
+	private Twitter _twitter;
+	private ConfigurationBuilder _configurationBuilder;
+	
+	private String _consumerKey;
+	private String _consumerSecret;
+	private String _accessToken;
+	private String _accessTokenSecret;
+	
+	private boolean _init = false;
+	
+	public TwitterConnector() {}
+	
+	public TwitterConnector(String connectionInfo)
+	{
+		parseConnectionInfo(connectionInfo);
+		_twitterFactory = new TwitterFactory(_configurationBuilder.build());
+		_twitter = _twitterFactory.getInstance();
+		_init = true;
+	}
+	
+	@Override
+	public void onLoad(CoapResponse response)
+	{
+		if(!_init) return;
+		try 
+		{
+			_twitter.updateStatus(response.getResponseText());
+		} 
+		catch (TwitterException e) {
+			e.printStackTrace();
+		}
+	}
+
+	...
+	
+	public void init()
+	{
+		_twitterFactory = new TwitterFactory(_configurationBuilder.build());
+		_twitter = _twitterFactory.getInstance();
+		_init = true;
+	}
+	
+	...
+}
+\end{lstlisting}
 
 \subsection{Le REST APIs e la libreria Twitter4J}
 Twitter mette a disposizione degli sviluppatori una interessante API (Application Programming Interface) REST, ovvero una interfaccia HTTP che utilizza il modello URL per ricevere le richieste dall'applicazione e restituisce i risultati in formato JSON. Le Twitter APIs utilizzano un sistema di autenticazione denominato OAuth, ed in particolare la versione 2.0, un protocollo che permette di ottenere un discreto livello di sicurezza per ottenere dati particolari. Il protocollo OAuth è standardizzato ed è stato recepito da IETF nel RFC 6749.
@@ -66,6 +229,30 @@ Come è importante per l'utente poter accedere ai dati della rete di smart objec
 \\Come per la parte cloud anche qui si è scelto un approccio aperto verso la gestione del DBMS, utilizzando i driver PDO offerti dal pacchetto PHP: PDO (PHP Data Objects) è un'interfaccia simile ad ODBC (da cui eredita anche alcune componenti), pensata per astrarre le operazioni sul database dal DBMS. Le operazioni sono quindi preparate in linguaggio SQL standard (compatibile con la maggior parte dei database SQL) e passate al PDO driver corretto, nel nostro caso MySQL. PDO è integrato a partire da PHP 5.1.
 \\\\Attraverso l'interfaccia Web, dopo aver effettuato il login, necessario al fine di autenticare l'utente, è possibile configurare i connettori (per il momento è disponibile solamente Twitter), immettendo le proprie credenziali che saranno necessarie al connettore per effettuare le operazioni specifiche. Una volta configurati, tramite apposita form, si può registrare una \textit{azione}: l'azione può essere di tipo \textit{observe} o \textit{periodic}, a seconda che si voglia effettuare un monitoraggio costante della risorsa oppure periodico, ed è possibile inserire la URL della risorsa da osservare, oltre che impostare altri parametri utili. Una volta premuto il pulsante di aggiunta dell'azione, i dati inseriti vengono serializzati e viene effettuata una chiamata RPC al metodo {\tt addAction} della classe {\tt CoapAgent} sulla cloud.
 \\Nella dashboard principale troviamo invece l'elenco delle azioni registrati, con la possibilità di eliminarle, e una sidebar che contiene tutti i messaggi pubblicati dai vari connettori in tempo reale.
+
+%TwitterConnector.java
+\lstset{title=Il codice PHP che serializza la chiamata RPC su XML e la deserializza per leggere il valore di ritorno, language=PHP}
+\begin{lstlisting}[float]
+if($_POST['eventType'] == "0")
+	$request = xmlrpc_encode_request("coap.addAction", array($_POST['actionName'], intval($_POST['connector']), $_POST['resourceURI']));
+else
+	$request = xmlrpc_encode_request("coap.addAction", array($_POST['actionName'], intval($_POST['connector']), $_POST['resourceURI'], intval($_POST['period'])));
+	
+$context = stream_context_create(array('http' => array(
+    'method' => "POST",
+    'header' => "Content-Type: text/xml",
+    'content' => $request
+)));
+
+$file = file_get_contents("http://localhost:8008", false, $context);
+
+$response = xmlrpc_decode($file);
+
+if($response == "1")
+	Header("Location: index.php?addStatus=success");
+else
+	Header("Location: index.php?addStatus=error");
+\end{lstlisting}
 
 \subsection{La libreria TwitterOAuth}
 L'interfaccia Web è anche munita di una sidebar, nel suo frontend, da cui è possibile visionare i dati pubblicati sui vari connettori. Per il connettore Twitter è stata utilizzata la libreria TwitterOAuth sviluppata da Abraham Williams per interfacciare in maniera semplice e robusta le Twitter REST APIs. La libreria prevede un flusso di autenticazione sicuro ed è stata sviluppata secondo il paradigma della programmazione ad oggetti, che la rende ordinata e semplice da utilizzare.
