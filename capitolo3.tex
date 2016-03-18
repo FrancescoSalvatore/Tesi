@@ -230,6 +230,12 @@ Come è importante per l'utente poter accedere ai dati della rete di smart objec
 \\\\Attraverso l'interfaccia Web, dopo aver effettuato il login, necessario al fine di autenticare l'utente, è possibile configurare i connettori (per il momento è disponibile solamente Twitter), immettendo le proprie credenziali che saranno necessarie al connettore per effettuare le operazioni specifiche. Una volta configurati, tramite apposita form, si può registrare una \textit{azione}: l'azione può essere di tipo \textit{observe} o \textit{periodic}, a seconda che si voglia effettuare un monitoraggio costante della risorsa oppure periodico, ed è possibile inserire la URL della risorsa da osservare, oltre che impostare altri parametri utili. Una volta premuto il pulsante di aggiunta dell'azione, i dati inseriti vengono serializzati e viene effettuata una chiamata RPC al metodo {\tt addAction} della classe {\tt CoapAgent} di JCoM.
 \\Nella dashboard principale troviamo invece l'elenco delle azioni registrati, con la possibilità di eliminarle, e una sidebar che contiene tutti i messaggi pubblicati dai vari connettori in tempo reale.
 
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{immagini/interfaccia-web.PNG}
+\caption{\textit{Uno screenshot dell'interfaccia Web con diverse azioni registrate. Si può notare, sul lato destro, la sidebar contenente i messaggi pubblicati dai connettori.}}
+\end{figure}
+
 %TwitterConnector.java
 \lstset{title=Il codice PHP che serializza la chiamata RPC su XML e la deserializza per leggere il valore di ritorno, language=PHP}
 \begin{lstlisting}[float]
